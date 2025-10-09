@@ -2,6 +2,7 @@ falcon
 httpx
 backoff
 keyring
+waitress
 
 black
 isort
