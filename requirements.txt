@@ -1,0 +1,9 @@
+falcon
+httpx
+backoff
+keyring
+waitress
+
+black
+isort
+flake8
