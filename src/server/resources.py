@@ -1,7 +1,18 @@
 import falcon
 from falcon import Request, Response
+from dataclasses import asdict
+import os
+import signal
+import threading
 
 from src.service.ssh_keys import add_ssh_pubkey
+from src.server.models import CreateInstance, ManageInstance
+from src.service import instances
+from src.storage import state as state_manager
+from src.utils.dto import from_json
+from src.utils.xlogging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PingResource:
@@ -16,45 +27,109 @@ class AddSSHResource:
 
     @staticmethod
     def on_post(req: Request, resp: Response) -> None:
-        ssh_pubkey = req.context["json"]["ssh_pubkey"]
-        add_ssh_pubkey(ssh_pubkey)
-        resp.context["result"] = {"ok": True, "data": None}
+        try:
+            ssh_pubkey = req.context["json"]["ssh_pubkey"]
+            add_ssh_pubkey(ssh_pubkey)
+            resp.status = falcon.HTTP_200
+            resp.context["result"] = {"ok": True, "data": None}
+        except (KeyError, TypeError):
+            raise falcon.HTTPBadRequest(
+                title="Invalid request",
+                description="Missing 'ssh_pubkey' field.",
+            )
+        except Exception as e:
+            logger.error(f"Failed to add SSH key: {e}")
+            raise falcon.HTTPInternalServerError(
+                title="Internal Error",
+                description="Could not process SSH key.",
+            )
 
 
 class ManageInstancesResource:
 
-    @staticmethod
-    def on_get(req: Request, resp: Response) -> None:
-        # TODO: get info (ex logs)
-        pass
+    def on_get(self, req: Request, resp: Response) -> None:
+        state = state_manager.get_current_state()
+        response_data = asdict(state)
 
-    @staticmethod
-    def on_post(req: Request, resp: Response) -> None:
-        # TODO: create instance
-        pass
+        if req.get_param_as_bool('logs') and state.container_id:
+            success, logs, err = instances.get_instance_logs(
+                state.container_id)
+            if success:
+                response_data['logs'] = logs
+            else:
+                response_data['logs_error'] = err
 
-    @staticmethod
-    def on_put(req: Request, resp: Response) -> None:
-        # TODO: manage (start, stop, reboot, etc)
-        pass
+        resp.status = falcon.HTTP_200
+        resp.context["result"] = {"ok": True, "data": response_data}
 
-    @staticmethod
-    def on_delete(req: Request, resp: Response) -> None:
-        # TODO: remove instance and all user data
-        pass
+    def on_post(self, req: Request, resp: Response) -> None:
+
+        try:
+            create_params = from_json(CreateInstance, req.context.get("json"))
+        except Exception as e:
+            raise falcon.HTTPBadRequest(title="Invalid JSON payload",
+                                        description=str(e))
+
+        success, data, error = instances.create_new_instance(create_params)
+
+        if success:
+            resp.status = falcon.HTTP_201
+            resp.context["result"] = {"ok": True, "data": data}
+        else:
+            resp.status = falcon.HTTP_500
+            resp.context["result"] = {"ok": False, "error": error}
+
+    def on_put(self, req: Request, resp: Response) -> None:
+        try:
+            manage_params = from_json(ManageInstance, req.context.get("json"))
+        except Exception as e:
+            raise falcon.HTTPBadRequest(title="Invalid JSON payload",
+                                        description=str(e))
+
+        success, error = instances.manage_instance(manage_params)
+
+        if success:
+            resp.status = falcon.HTTP_200
+            resp.context["result"] = {"ok": True}
+        else:
+            resp.status = falcon.HTTP_500
+            resp.context["result"] = {"ok": False, "error": error}
+
+    def on_delete(self, req: Request, resp: Response) -> None:
+        success, error = instances.delete_instance()
+        if success:
+            resp.status = falcon.HTTP_200
+            resp.context["result"] = {"ok": True}
+        else:
+            resp.status = falcon.HTTP_500
+            resp.context["result"] = {"ok": False, "error": error}
 
 
 class ShutdownResource:
 
-    @staticmethod
-    def on_post(req: Request, resp: Response) -> None:
-        #  TODO: stops agent
-        pass
+    def on_post(self, req: Request, resp: Response) -> None:
+        logger.warning("Shutdown request received. Agent is shutting down...")
+
+        def shutdown_thread():
+            threading.Timer(1.0, lambda: os.kill(os.getpid(),
+                                                 signal.SIGINT)).start()
+
+        shutdown_thread()
+
+        resp.status = falcon.HTTP_202
+        resp.context["result"] = {"ok": True,
+                                  "message": "Agent shutdown initiated."}
 
 
 class EmergencyResource:
 
-    @staticmethod
-    def on_post(req: Request, resp: Response) -> None:
-        # TODO: kill all instances and clear data
-        pass
+    def on_post(self, req: Request, resp: Response) -> None:
+        logger.critical("EMERGENCY self-destruct sequence initiated via API!")
+
+        threading.Thread(target=instances.emergency_self_destruct).start()
+
+        resp.status = falcon.HTTP_202
+        resp.context["result"] = {
+            "ok": True,
+            "message": "Emergency self-destruct sequence initiated.",
+        }

@@ -38,6 +38,11 @@ class XLogger:
         else:
             self._logger.error(message, exc_info=exc_info)
 
+    def critical(
+            self, message: str, exc: Optional[Exception] = None, exc_info: bool = True,
+    ):
+        self._logger.critical(message, exc_info=exc_info)
+
 
 @lru_cache
 def get_logger(service_name: str) -> XLogger:
