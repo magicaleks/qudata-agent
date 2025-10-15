@@ -98,13 +98,19 @@ async def talk(req_json):
     data=await r.read(65535); w.close(); await w.wait_closed()
     try: return json.loads(data.decode())
     except: return {"allow": False, "reason":"bad_agent_response"}
-async def handle(request):
+async def handle_req(request):
     try: j=await request.json()
     except: return web.json_response({"Allow": False, "Err":"bad_json"})
     req={"RequestUri":j.get("RequestUri"),"RequestMethod":j.get("RequestMethod")}
     res=await talk(req)
     return web.json_response({"Allow": bool(res.get("allow")), "Err": res.get("reason","")})
-app=web.Application(); app.router.add_post("/AuthZPlugin.AuthZReq",handle)
+async def handle_res(request):
+    try: j=await request.json()
+    except: return web.json_response({"Allow": False, "Err":"bad_json"})
+    req={"RequestUri":j.get("RequestUri"),"RequestMethod":j.get("RequestMethod")}
+    res=await talk(req)
+    return web.json_response({"Allow": bool(res.get("allow")), "Err": res.get("reason","")})
+app=web.Application(); app.router.add_post("/AuthZPlugin.AuthZReq",handle_req); app.router.add_post("/AuthZPlugin.AuthZRes",handle_res)
 if __name__=="__main__":
     path="/run/docker/plugins/kata_guard.sock"
     os.makedirs(os.path.dirname(path),exist_ok=True)
@@ -139,6 +145,12 @@ cat >/etc/docker/daemon.json <<'JSON'
 }
 JSON
 systemctl restart docker || true
+# Минимальная проверка ответов плагина — ожидаем HTTP 200 на оба эндпоинта
+sleep 1
+curl --unix-socket "$PLUGIN_SOCK" -s -o /dev/null -w '%{http_code}\n' \
+  http://localhost/AuthZPlugin.AuthZReq -X POST -d '{}' | grep -q '^200$' || true
+curl --unix-socket "$PLUGIN_SOCK" -s -o /dev/null -w '%{http_code}\n' \
+  http://localhost/AuthZPlugin.AuthZRes -X POST -d '{}' | grep -q '^200$' || true
 
 echo "[7] Отчёт JSON"
 mkdir -p "$(dirname "$REPORT")"
