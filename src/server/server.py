@@ -11,8 +11,8 @@ from src.server.resources import (
 
 app = App()
 
-app.add_middleware(JSONMiddleware)
-app.add_middleware(AuthMiddleware)
+app.add_middleware(JSONMiddleware())
+app.add_middleware(AuthMiddleware())
 
 app.add_route("/ping", PingResource)
 app.add_route("/ssh", AddSSHResource)
