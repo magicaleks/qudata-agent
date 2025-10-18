@@ -2,9 +2,10 @@
 import sys
 from threading import Thread
 
-from src.agent import app, cli, security_daemon
+from src.agent import app, cli
+from src.security.auth_daemon import auth_daemon
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = dict(arg.split("=", 1) for arg in sys.argv[1:] if "=" in arg)
     mode = args.get("type")
 
@@ -18,7 +19,7 @@ if __name__ == '__main__':
         #     except Exception:
         #         pass
 
-        t = Thread(target=security_daemon, daemon=True)
+        t = Thread(target=auth_daemon, daemon=True)
         t.start()
         app()
 
