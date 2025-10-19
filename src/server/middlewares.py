@@ -28,7 +28,7 @@ class JSONMiddleware:
             req.context["json"] = None
 
     def process_response(
-	    self,
+        self,
         req: falcon.Request,
         resp: falcon.Response,
         resource,

@@ -39,7 +39,10 @@ class XLogger:
             self._logger.error(message, exc_info=exc_info)
 
     def critical(
-            self, message: str, exc: Optional[Exception] = None, exc_info: bool = True,
+        self,
+        message: str,
+        exc: Optional[Exception] = None,
+        exc_info: bool = True,
     ):
         self._logger.critical(message, exc_info=exc_info)
 

@@ -16,22 +16,24 @@ def _read_keys() -> set[str]:
         logger.error(f"Failed to read authorized_keys file: {e}")
         return set()
 
+
 def _write_keys(keys: set[str]) -> bool:
     try:
         AUTHORIZED_KEYS_PATH.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
 
-        content = '\n'.join(sorted(list(keys))) + '\n'
+        content = "\n".join(sorted(list(keys))) + "\n"
 
         AUTHORIZED_KEYS_PATH.write_text(content, encoding="utf-8")
 
         AUTHORIZED_KEYS_PATH.chmod(0o600)
 
-        logger.info(f'Succesfully write {len(keys)} keys to authorized_keys')
+        logger.info(f"Succesfully write {len(keys)} keys to authorized_keys")
         return True
 
     except IOError as e:
         logger.error(f"Failed to write authorized_keys file: {e}")
         return False
+
 
 def add_ssh_pubkey(pubkey: str) -> bool:
     pubkey = pubkey.strip()
@@ -47,6 +49,7 @@ def add_ssh_pubkey(pubkey: str) -> bool:
     current_keys.add(pubkey)
     return _write_keys(current_keys)
 
+
 def remove_ssh_pubkey(pubkey: str) -> bool:
     pubkey = pubkey.strip()
     if not pubkey:
@@ -60,6 +63,7 @@ def remove_ssh_pubkey(pubkey: str) -> bool:
 
     current_keys.remove(pubkey)
     return _write_keys(current_keys)
+
 
 def clear_ssh_keys() -> bool:
     logger.warning("Clearing all ssh keys")

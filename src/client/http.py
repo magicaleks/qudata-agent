@@ -15,7 +15,7 @@ class HttpClient:
         if secret:
             self._client.headers.update({consts.APP_HEADER_NAME: secret})
 
-    @backoff.on_exception(backoff.expo, httpx.HTTPError, max_time=60, max_retries=5)
+    @backoff.on_exception(backoff.expo, httpx.HTTPError, max_time=60, max_tries=5)
     def _request(
         self,
         method: str,
