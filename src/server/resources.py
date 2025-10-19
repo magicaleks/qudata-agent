@@ -17,16 +17,14 @@ logger = get_logger(__name__)
 
 class PingResource:
 
-    @staticmethod
-    def on_get(req: Request, resp: Response) -> None:
+    def on_get(self, req: Request, resp: Response) -> None:
         resp.status = falcon.HTTP_200
         resp.context["result"] = {"ok": True, "data": None}
 
 
 class AddSSHResource:
 
-    @staticmethod
-    def on_post(req: Request, resp: Response) -> None:
+    def on_post(self, req: Request, resp: Response) -> None:
         try:
             ssh_pubkey = req.context["json"]["ssh_pubkey"]
             add_ssh_pubkey(ssh_pubkey)

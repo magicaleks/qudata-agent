@@ -2,7 +2,8 @@ falcon
 httpx
 backoff
 keyring
-waitress
+gunicorn
+keyrings.cryptfile
 
 black
 isort

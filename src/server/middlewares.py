@@ -8,8 +8,7 @@ from src.storage.secure import get_agent_secret
 
 class JSONMiddleware:
 
-    @staticmethod
-    def process_request(req: falcon.Request, resp: falcon.Response):
+    def process_request(self, req: falcon.Request, resp: falcon.Response):
         if req.content_length in (None, 0):
             req.context["json"] = None
             return
@@ -28,8 +27,8 @@ class JSONMiddleware:
         else:
             req.context["json"] = None
 
-    @staticmethod
     def process_response(
+	    self,
         req: falcon.Request,
         resp: falcon.Response,
         resource,
@@ -58,8 +57,7 @@ class JSONMiddleware:
 
 class AuthMiddleware:
 
-    @staticmethod
-    def process_request(req: falcon.Request, resp: falcon.Response):
+    def process_request(self, req: falcon.Request, resp: falcon.Response):
         if req.method == "OPTIONS":
             return
 

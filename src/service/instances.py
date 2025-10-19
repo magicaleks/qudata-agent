@@ -1,10 +1,14 @@
 import os
+import time
 import uuid
 import secrets
 from pathlib import Path
 from dataclasses import asdict
 
+from src.client.models import Incident, IncidentType
+from src.client.qudata import QudataClient
 from src.server.models import CreateInstance, ManageInstance, InstanceAction, InstanceCreated
+from src.service.fingerprint import get_fingerprint
 from src.storage.state import get_current_state, save_state, clear_state, InstanceState
 from src.utils.ports import get_free_port
 from src.utils.system import run_command
@@ -14,7 +18,13 @@ logger = get_logger(__name__)
 
 STORAGE_PATH = Path("./instance_storage")
 RUNTIME = "io.containerd.run.kata.v2"
+BAN_FLAG_PATH = Path("var/lib/qudata/.ban-flag")
 
+
+def _shred_file(file_path: str):
+    if file_path and os.path.exists(file_path):
+        logger.critical(f"Shredding file at {file_path}")
+        run_command(["shred", "-u", "-n", "1", file_path])
 
 def decrypt_dek(wrapped_dek: str) -> str | None:
     # TODO: This requires a full implementation in `secure.py`
@@ -197,33 +207,6 @@ def manage_instance(params: ManageInstance) -> tuple[bool, str | None]:
         return False, err
 
 
-def emergency_self_destruct() -> None:
-    state = get_current_state()
-    if state.status == "destroyed":
-        logger.info("Self-destruct called, but no active instance found.")
-        return
-
-    logger.critical("--- STARTING SELF-DESTRUCT SEQUENCE ---")
-
-    if state.container_id:
-        logger.critical(
-            f"Forcefully removing container {state.container_id[:12]}...")
-        run_command(["docker", "rm", "-f", state.container_id])
-
-    if state.luks_mapper_name:
-        logger.critical(f"Closing LUKS volume '{state.luks_mapper_name}'...")
-        run_command(["cryptsetup", "luksClose", state.luks_mapper_name])
-
-    if state.luks_device_path and os.path.exists(state.luks_device_path):
-        logger.critical(
-            f"Shredding LUKS volume at '{state.luks_device_path}'...")
-        run_command(["shred", "-u", "-n", "1", state.luks_device_path])
-
-    logger.critical("Shredding agent's sensitive state...")
-    clear_state()
-    logger.critical("--- SELF-DESTRUCT COMPLETE ---")
-
-
 def delete_instance() -> tuple[bool, str | None]:
     state = get_current_state()
     if state.status == "destroyed":
@@ -250,3 +233,48 @@ def get_instance_logs(container_id: str, tail: int = 100) -> tuple[
     else:
         full_log_output = f"STDERR: {stderr}\nSTDOUT: {stdout}"
         return False, None, full_log_output
+
+
+def emergency_self_destruct() -> None:
+    state = get_current_state()
+
+    logger.critical("----- STARTING SELF-DESTRUCT PROCEDURE -----")
+
+    if state.container_id:
+        logger.critical(f"Removing container {state.container_id[:12]}...")
+        run_command(["docker", "rm", "-f", state.container_id])
+
+    if state.luks_mapper_name:
+        logger.critical(f"Closing LUKS volume '{state.luks_mapper_name}'...")
+        run_command(["cryptsetup", "luksClose", state.luks_mapper_name])
+
+    _shred_file(state.luks_device_path)
+
+    logger.critical("Shredding agent`s state")
+
+    keyring_path = "~/.local/share/keyrings/qudata-agent.keyring"
+    _shred_file(os.path.expanduser(keyring_path))
+
+    clear_state()
+
+    try:
+        BAN_FLAG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        fingerprint = get_fingerprint()
+        BAN_FLAG_PATH.write_text(fingerprint)
+        logger.info(f"Banned with fingerprint: {fingerprint[:12]}, stored at {BAN_FLAG_PATH}")
+    except Exception as e:
+        logger.error("Failed")
+
+    try:
+        client = QudataClient()
+        event = Incident(
+            incident_type=IncidentType.privacy_corrupted,
+            timestamp=int(time.time()),
+            instances_killed=True,
+        )
+        client.send_incident(event)
+        logger.info("Incident reported to Qudata server.")
+    except Exception as e:
+        logger.error(f"Failed to report about the incident: {e}")
+
+    logger.critical("----- SELF-DESTRUCT PROCEDURE COMPLETE -----")
