@@ -2,36 +2,55 @@
 import os
 import sys
 import time
+import subprocess
 from threading import Thread
 from multiprocessing import Process, Pipe
 
-from src.agent import app, cli
+from src.agent import cli
 from src.security.auth_daemon import auth_daemon
 from src.service.instances import emergency_self_destruct
 
 
 def run_agent_process(pipe_conn):
     try:
-        from threading import Thread
         t = Thread(target=auth_daemon, daemon=True)
         t.start()
 
-        def heartbeat():
+        def heartbeat_thread(pipe):
             while True:
                 try:
-                    pipe_conn.send("AGENT_PULSE")
+                    pipe.send("AGENT_PULSE")
                     time.sleep(1)
                 except (IOError, EOFError):
-                    print("CRITICAL: Guardian process disconnected! Initiate self destruct", file=sys.stderr)
+                    print("CRITICAL: Guardian process disconnected!",
+                          file=sys.stderr)
                     emergency_self_destruct()
                     os._exit(1)
 
-        hb_thread = Thread(target=heartbeat)
+        hb_thread = Thread(target=heartbeat_thread, args=(pipe_conn,))
         hb_thread.start()
 
-        print("INFO: Main agent process and daemon are running")
+        print("INFO: Main agent process running. Starting Gunicorn server...")
 
-    except KeyboardInterrupt: pass
+        gunicorn_command = [
+            sys.executable,
+            "-m", "gunicorn",
+            "-w", "3",
+            "-b", "0.0.0.0:8000",
+            "--chdir", ".",
+            "src.server.server:app"
+        ]
+
+        process = subprocess.run(gunicorn_command)
+
+        print(
+            f"INFO: Gunicorn process terminated with code {process.returncode}.",
+            file=sys.stderr)
+
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(f"FATAL ERROR IN AGENT PROCESS: {e}", file=sys.stderr)
 
 def run_guardian_process(pipe_conn, parent_pid):
     print("INFO: Guardian process started.")

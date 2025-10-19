@@ -36,9 +36,21 @@ systemctl restart containerd
 
 echo "[3] Kata установка и CoCo детекция"
 curl -fsSL https://repo.katacontainers.io/archive.key | gpg --dearmor -o /usr/share/keyrings/kata.gpg
-echo "deb [signed-by=/usr/share/keyrings/kata.gpg] https://repo.katacontainers.io/ubuntu/ $(lsb_release -cs) main" >/etc/apt/sources.list.d/kata-containers.list
-apt-get update -y
-apt-get install -y kata-runtime kata-shim kata-proxy kata-containers || true
+echo "[3] Установка Kata Containers (через kata-manager.sh)"
+KATA_SCRIPT_URL="https://raw.githubusercontent.com/kata-containers/kata-containers/main/utils/kata-manager.sh"
+KATA_SCRIPT="/usr/local/bin/kata-manager.sh"
+sudo curl -fsSL "$KATA_SCRIPT_URL" -o "$KATA_SCRIPT"
+sudo chmod +x "$KATA_SCRIPT"
+sudo "$KATA_SCRIPT" -D || {
+    echo "Ошибка установки Kata Containers"
+    exit 1
+}
+if ! command -v kata-runtime &>/dev/null; then
+    echo "❌ Kata runtime не найден! Установка не удалась."
+    exit 1
+fi
+echo "✅ Kata Containers успешно установлены"
+kata-runtime --version
 
 CPUFLAGS=$(tr '[:upper:]' '[:lower:]' </proc/cpuinfo | grep -m1 'flags' || true)
 HAS_SEV=false; HAS_SNP=false; HAS_TDX=false
