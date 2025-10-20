@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" serverName="test2" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="test">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/shit/qudata" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="test2">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/agent" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/.venv" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>
