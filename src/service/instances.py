@@ -50,13 +50,11 @@ def create_new_instance(params: CreateInstance) -> tuple[bool, dict | None, str 
         return False, None, err
 
     logger.info(
-        f"Received request to create a new instance with image {params.image}:{params.image_tag}"
-    )
+        f"Received request to create a new instance with image {params.image}:{params.image_tag}")
     instance_id = str(uuid.uuid4())
 
     logger.warning(
-        "SECURITY DISABLED: Running in 'vanilla Docker' mode. LUKS and Kata are bypassed."
-    )
+        "SECURITY DISABLED: Running in 'vanilla Docker' mode. LUKS and Kata are bypassed.")
 
     logger.info("Preparing to launch instance via standard Docker...")
 
@@ -65,10 +63,8 @@ def create_new_instance(params: CreateInstance) -> tuple[bool, dict | None, str 
     gpu_count = (params.env_variables or {}).pop("QUDATA_GPU_COUNT", "0")
 
     docker_command = [
-        "docker",
-        "run",
-        "-d",
-        "--rm",
+        "docker", "run",
+        "-d", "--rm",
         f"--cpus={cpu_cores}",
         f"--memory={memory_gb}g",
     ]
@@ -85,8 +81,7 @@ def create_new_instance(params: CreateInstance) -> tuple[bool, dict | None, str 
         allocated_ports[container_port] = host_port
 
     for key, value in (params.env_variables or {}).items():
-        if key == "QUDATA_WRAPPED_DEK":
-            continue
+        if key == "QUDATA_WRAPPED_DEK": continue
         docker_command.extend(["-e", f"{key}={value}"])
 
     if params.ssh_enabled and "22" not in (params.ports or {}):
@@ -114,11 +109,7 @@ def create_new_instance(params: CreateInstance) -> tuple[bool, dict | None, str 
     )
     if not save_state(new_state):
         run_command(["docker", "rm", "-f", container_id])
-        return (
-            False,
-            None,
-            "CRITICAL: Failed to save state after container creation. Rolled back.",
-        )
+        return False, None, "CRITICAL: Failed to save state after container creation. Rolled back."
 
     created_data = InstanceCreated(success=True, ports=allocated_ports)
     return True, asdict(created_data), None
@@ -191,7 +182,8 @@ def emergency_self_destruct() -> None:
     state = get_current_state()
     logger.critical("--- STARTING (Simplified) SELF-DESTRUCT SEQUENCE ---")
     if state.container_id:
-        logger.critical(f"Forcefully removing container {state.container_id[:12]}...")
+        logger.critical(
+            f"Forcefully removing container {state.container_id[:12]}...")
         run_command(["docker", "rm", "-f", state.container_id])
 
     logger.critical("Shredding agent's sensitive state...")
@@ -201,10 +193,8 @@ def emergency_self_destruct() -> None:
         BAN_FLAG_PATH.parent.mkdir(parents=True, exist_ok=True)
         fingerprint = get_fingerprint()
         BAN_FLAG_PATH.write_text(fingerprint)
-        logger.info(
-            f"Banned with fingerprint: {fingerprint[:12]}, "
-            f"stored at {BAN_FLAG_PATH}"
-        )
+        logger.info(f"Banned with fingerprint: {fingerprint[:12]}, "
+                    f"stored at {BAN_FLAG_PATH}")
     except Exception as e:
         logger.error("Failed")
 
