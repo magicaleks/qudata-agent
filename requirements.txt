@@ -3,6 +3,7 @@ httpx
 backoff
 keyring
 gunicorn
+psutil
 keyrings.cryptfile
 
 black
