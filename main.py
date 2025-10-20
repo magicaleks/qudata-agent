@@ -6,16 +6,43 @@ from threading import Thread
 import subprocess
 import psutil
 
+from src import runtime
 from src.security.auth_daemon import auth_daemon
+from src.service.fingerprint import get_fingerprint
 from src.service.instances import emergency_self_destruct
 from src.client.qudata import QudataClient
-from src.client.models import Stats
+from src.client.models import Stats, InitAgent
 from src.storage.state import get_current_state
 from src.utils.enums import InstanceStatus
 
 
 def run_agent_process(pipe_conn):
     try:
+        client = QudataClient()
+        agent_secret = client._client.headers.get("X-Agent-Secret")
+
+        if not agent_secret:
+            print(
+                "INFO: No agent secret found. Performing initial registration (init)...")
+            try:
+                init_data = InitAgent(
+                    agent_id="placeholder-id", #заглушка
+                    agent_port=8000,
+                    address=runtime.agent_address(),
+                    fingerprint=get_fingerprint(),
+                    pid=runtime.agent_pid()
+                )
+
+                agent_response = client.init(init_data)
+                print(
+                    f"INFO: Agent initialization successful. Secret received: {agent_response.secret_key is not None}")
+            except Exception as e:
+                print(f"FATAL: Agent initialization failed: {e}",
+                      file=sys.stderr)
+                return
+        else:
+            print("INFO: Agent secret found. Skipping initialization.")
+
         auth_daemon_thread = Thread(target=auth_daemon, daemon=True)
         auth_daemon_thread.start()
 
@@ -40,6 +67,11 @@ def run_agent_process(pipe_conn):
             while True:
                 try:
                     state = get_current_state()
+                    if state.status == "destroyed":
+                        print("INFO: No active instance. Stats heartbeat is idle.")
+                        time.sleep(15)
+                        continue
+
                     try:
                         container_status_enum = InstanceStatus(state.status)
                     except ValueError:
@@ -50,7 +82,7 @@ def run_agent_process(pipe_conn):
                         ram_util=psutil.virtual_memory().percent,
                         instance_status=container_status_enum,
                     )
-
+                    # небольшое пояснение, сбор других данных чуть позже добавлю
                     print(
                         f"INFO: Sending stats heartbeat. Current instance status: {stats_data.instance_status.value}")
                     client.send_stats(stats_data)
