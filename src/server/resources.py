@@ -1,13 +1,14 @@
-import falcon
-from falcon import Request, Response
-from dataclasses import asdict
 import os
 import signal
 import threading
+from dataclasses import asdict
 
-from src.service.ssh_keys import add_ssh_pubkey
+import falcon
+from falcon import Request, Response
+
 from src.server.models import CreateInstance, ManageInstance
 from src.service import instances
+from src.service.ssh_keys import add_ssh_pubkey
 from src.storage import state as state_manager
 from src.utils.dto import from_json
 from src.utils.xlogging import get_logger
@@ -49,13 +50,12 @@ class ManageInstancesResource:
         state = state_manager.get_current_state()
         response_data = asdict(state)
 
-        if req.get_param_as_bool('logs') and state.container_id:
-            success, logs, err = instances.get_instance_logs(
-                state.container_id)
+        if req.get_param_as_bool("logs") and state.container_id:
+            success, logs, err = instances.get_instance_logs(state.container_id)
             if success:
-                response_data['logs'] = logs
+                response_data["logs"] = logs
             else:
-                response_data['logs_error'] = err
+                response_data["logs_error"] = err
 
         resp.status = falcon.HTTP_200
         resp.context["result"] = {"ok": True, "data": response_data}
@@ -65,8 +65,9 @@ class ManageInstancesResource:
         try:
             create_params = from_json(CreateInstance, req.context.get("json"))
         except Exception as e:
-            raise falcon.HTTPBadRequest(title="Invalid JSON payload",
-                                        description=str(e))
+            raise falcon.HTTPBadRequest(
+                title="Invalid JSON payload", description=str(e)
+            )
 
         success, data, error = instances.create_new_instance(create_params)
 
@@ -81,8 +82,9 @@ class ManageInstancesResource:
         try:
             manage_params = from_json(ManageInstance, req.context.get("json"))
         except Exception as e:
-            raise falcon.HTTPBadRequest(title="Invalid JSON payload",
-                                        description=str(e))
+            raise falcon.HTTPBadRequest(
+                title="Invalid JSON payload", description=str(e)
+            )
 
         success, error = instances.manage_instance(manage_params)
 
@@ -109,14 +111,12 @@ class ShutdownResource:
         logger.warning("Shutdown request received. Agent is shutting down...")
 
         def shutdown_thread():
-            threading.Timer(1.0, lambda: os.kill(os.getpid(),
-                                                 signal.SIGINT)).start()
+            threading.Timer(1.0, lambda: os.kill(os.getpid(), signal.SIGINT)).start()
 
         shutdown_thread()
 
         resp.status = falcon.HTTP_202
-        resp.context["result"] = {"ok": True,
-                                  "message": "Agent shutdown initiated."}
+        resp.context["result"] = {"ok": True, "message": "Agent shutdown initiated."}
 
 
 class EmergencyResource:

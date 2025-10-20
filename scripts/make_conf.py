@@ -44,10 +44,7 @@ def get_mem_info() -> dict:
 def get_disk_info() -> dict:
     try:
         size_gb = float(
-            sh(
-                "lsblk -b -d -n -o SIZE | awk '{s+=$1} END {print "
-                "s/1024/1024/1024}'"
-            )
+            sh("lsblk -b -d -n -o SIZE | awk '{s+=$1} END {print " "s/1024/1024/1024}'")
         )
         return {"amount": round(size_gb, 2), "unit": "gb"}
     except Exception:
@@ -58,9 +55,7 @@ def get_network_speed() -> tuple[Optional[float], Optional[float]]:
     iface = sh("ip route | grep default | awk '{print $5}'")
     if not iface:
         return None, None
-    out = sh(
-        f"ethtool {iface} 2>/dev/null | grep Speed | awk '{{print $2}}'"
-    )
+    out = sh(f"ethtool {iface} 2>/dev/null | grep Speed | awk '{{print $2}}'")
     try:
         speed_gbps = float(out.replace("Mb/s", "")) / 1000.0
         return speed_gbps, speed_gbps
@@ -70,9 +65,7 @@ def get_network_speed() -> tuple[Optional[float], Optional[float]]:
 
 # ---------------- GPU ---------------- #
 def get_gpu_info():
-    gpu_name = sh(
-        "nvidia-smi --query-gpu=name --format=csv,noheader | head -n1"
-    )
+    gpu_name = sh("nvidia-smi --query-gpu=name --format=csv,noheader | head -n1")
     if not gpu_name:
         return None, 0, 0.0, None
     gpus = sh("nvidia-smi --query-gpu=name --format=csv,noheader | wc -l")
@@ -82,9 +75,7 @@ def get_gpu_info():
         "| head -n1"
     )
     vram_gb = round(float(vram) / 1024.0, 2) if vram else 0.0
-    max_cuda = sh(
-        "nvidia-smi | grep -m1 CUDA | awk '{print $NF}'"
-    )
+    max_cuda = sh("nvidia-smi | grep -m1 CUDA | awk '{print $NF}'")
     try:
         max_cuda_v = float(re.findall(r"[\d.]+", max_cuda)[0])
     except Exception:
@@ -100,12 +91,10 @@ def get_location() -> dict:
             resp.raise_for_status()
             data = resp.json()
         else:
-            import urllib.request
             import json as _json
+            import urllib.request
 
-            with urllib.request.urlopen(
-                "https://ipinfo.io/json", timeout=2
-            ) as r:
+            with urllib.request.urlopen("https://ipinfo.io/json", timeout=2) as r:
                 data = _json.load(r)
         return {
             "city": data.get("city"),
@@ -118,15 +107,11 @@ def get_location() -> dict:
 
 # ---------------- CoCo Hardware Detection ---------------- #
 def detect_coco_capabilities() -> dict:
-    flags = sh(
-        "grep flags /proc/cpuinfo | head -n1 | tr '[:upper:]' '[:lower:]'"
-    )
+    flags = sh("grep flags /proc/cpuinfo | head -n1 | tr '[:upper:]' '[:lower:]'")
     has_sev = "sev" in flags
     has_snp = "sev_snp" in flags or "sev-snp" in flags
     has_tdx = bool(sh("grep -w tdx_guest /proc/cpuinfo"))
-    iommu_on = bool(
-        re.search(r"intel_iommu=on|amd_iommu=on", sh("cat /proc/cmdline"))
-    )
+    iommu_on = bool(re.search(r"intel_iommu=on|amd_iommu=on", sh("cat /proc/cmdline")))
     return {
         "sev": has_sev,
         "sev_snp": has_snp,

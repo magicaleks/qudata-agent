@@ -1,15 +1,20 @@
 import os
+import secrets
 import time
 import uuid
-import secrets
-from pathlib import Path
 from dataclasses import asdict
+from pathlib import Path
 
 from src.client.models import Incident, IncidentType
 from src.client.qudata import QudataClient
-from src.server.models import CreateInstance, ManageInstance, InstanceAction, InstanceCreated
+from src.server.models import (
+    CreateInstance,
+    InstanceAction,
+    InstanceCreated,
+    ManageInstance,
+)
 from src.service.fingerprint import get_fingerprint
-from src.storage.state import get_current_state, save_state, clear_state, InstanceState
+from src.storage.state import InstanceState, clear_state, get_current_state, save_state
 from src.utils.ports import get_free_port
 from src.utils.system import run_command
 from src.utils.xlogging import get_logger
@@ -26,17 +31,18 @@ def _shred_file(file_path: str):
         logger.critical(f"Shredding file at {file_path}")
         run_command(["shred", "-u", "-n", "1", file_path])
 
+
 def decrypt_dek(wrapped_dek: str) -> str | None:
     # TODO: This requires a full implementation in `secure.py`
     logger.warning(
-        "Using a placeholder DEK decryption. This is INSECURE for production.")
+        "Using a placeholder DEK decryption. This is INSECURE for production."
+    )
     if wrapped_dek:
         return secrets.token_hex(16)
     return None
 
 
-def create_new_instance(params: CreateInstance) -> tuple[
-    bool, dict | None, str | None]:
+def create_new_instance(params: CreateInstance) -> tuple[bool, dict | None, str | None]:
     state = get_current_state()
     if state.status != "destroyed":
         err = f"An instance '{state.instance_id}' already exists with status '{state.status}'. Please delete it first."
@@ -68,8 +74,9 @@ def create_new_instance(params: CreateInstance) -> tuple[
 
     allocated_ports = {}
     for container_port, host_port_def in (params.ports or {}).items():
-        host_port = str(host_port_def if str(
-            host_port_def).lower() != "auto" else get_free_port())
+        host_port = str(
+            host_port_def if str(host_port_def).lower() != "auto" else get_free_port()
+        )
         docker_command.extend(["-p", f"{host_port}:{container_port}"])
         allocated_ports[container_port] = host_port
 
@@ -77,10 +84,10 @@ def create_new_instance(params: CreateInstance) -> tuple[
         if key == "QUDATA_WRAPPED_DEK": continue
         docker_command.extend(["-e", f"{key}={value}"])
 
-    if params.ssh_enabled and '22' not in (params.ports or {}):
+    if params.ssh_enabled and "22" not in (params.ports or {}):
         host_ssh_port = str(get_free_port())
         docker_command.extend(["-p", f"{host_ssh_port}:22"])
-        allocated_ports['22'] = host_ssh_port
+        allocated_ports["22"] = host_ssh_port
 
     image_full_name = f"{params.image}:{params.image_tag}"
     docker_command.append(image_full_name)
@@ -107,18 +114,16 @@ def create_new_instance(params: CreateInstance) -> tuple[
     created_data = InstanceCreated(success=True, ports=allocated_ports)
     return True, asdict(created_data), None
 
+
 def manage_instance(params: ManageInstance) -> tuple[bool, str | None]:
     state = get_current_state()
     if state.status == "destroyed" or not state.container_id:
         return False, "No active instance to manage."
 
     action_map = {
-        InstanceAction.stop: (["docker", "stop", state.container_id],
-                              "paused"),
-        InstanceAction.start: (["docker", "start", state.container_id],
-                               "running"),
-        InstanceAction.restart: (["docker", "restart", state.container_id],
-                                 "running"),
+        InstanceAction.stop: (["docker", "stop", state.container_id], "paused"),
+        InstanceAction.start: (["docker", "start", state.container_id], "running"),
+        InstanceAction.restart: (["docker", "restart", state.container_id], "running"),
     }
 
     if params.action not in action_map:
@@ -127,7 +132,8 @@ def manage_instance(params: ManageInstance) -> tuple[bool, str | None]:
     command, new_status = action_map[params.action]
 
     logger.info(
-        f"Executing action '{params.action}' on container {state.container_id[:12]}...")
+        f"Executing action '{params.action}' on container {state.container_id[:12]}..."
+    )
     success, _, stderr = run_command(command)
 
     if success:
@@ -154,8 +160,9 @@ def delete_instance() -> tuple[bool, str | None]:
     return True, None
 
 
-def get_instance_logs(container_id: str, tail: int = 100) -> tuple[
-    bool, str | None, str | None]:
+def get_instance_logs(
+    container_id: str, tail: int = 100
+) -> tuple[bool, str | None, str | None]:
     if not container_id:
         return False, None, "Container ID is missing."
 

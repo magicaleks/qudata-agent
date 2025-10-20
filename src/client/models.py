@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 from typing import Optional
 
 
@@ -18,11 +18,6 @@ class AgentResponse:
     emergency_reinit: bool
     host_exists: bool
     secret_key: Optional[str] = None
-
-
-class MemoryUnit(StrEnum):
-    gb = "gb"
-    mb = "mb"
 
 
 @dataclass
@@ -62,7 +57,7 @@ class CreateHost:
     configuration: ConfigurationData
 
 
-class IncidentType(StrEnum):
+class IncidentType(Enum):
     agent_unavailable = "agent_unavailable"
     server_fail = "server_fail"
     privacy_corrupted = "privacy_corrupted"
@@ -70,12 +65,12 @@ class IncidentType(StrEnum):
 
 @dataclass
 class Incident:
-    incident_type: IncidentType
+    incident_type: str
     timestamp: int
     instances_killed: bool
 
 
-class InstanceStatus(StrEnum):
+class InstanceStatus(Enum):
     pending = "pending"
     running = "running"
     paused = "paused"
@@ -93,4 +88,4 @@ class Stats:
     inet_in: int = 0
     inet_out: int = 0
     instance_status_reason: Optional[str] = None
-    instance_status: Optional[InstanceStatus] = None
+    instance_status: Optional[str] = None

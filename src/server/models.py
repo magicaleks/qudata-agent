@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import Enum
 from typing import Optional
 
 
@@ -19,6 +19,7 @@ class CreateInstance:
     command: Optional[str] = None
     ssh_enabled: bool = False
 
+
 @dataclass
 class InstanceCreated:
     success: bool
@@ -26,11 +27,13 @@ class InstanceCreated:
     tunnel_host: Optional[str] = None
     tunnel_token: Optional[str] = None
 
-class InstanceAction(StrEnum):
+
+class InstanceAction(Enum):
     start = "start"
     stop = "stop"
     restart = "restart"
     delete = "delete"
+
 
 @dataclass
 class ManageInstance:

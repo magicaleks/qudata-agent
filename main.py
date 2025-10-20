@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import time
 from multiprocessing import Process, Pipe
@@ -56,7 +57,7 @@ def run_agent_process(pipe_conn):
                         "CRITICAL: Guardian process disconnected! Initiating self-destruct.",
                         file=sys.stderr)
                     emergency_self_destruct()
-                    os._exit(1)
+                    exit(1)
 
         hb_thread = Thread(target=heartbeat_to_guardian_thread, daemon=True)
         hb_thread.start()
@@ -103,17 +104,22 @@ def run_agent_process(pipe_conn):
 
         gunicorn_command = [
             sys.executable,
-            "-m", "gunicorn",
-            "-w", "3",
-            "-b", "0.0.0.0:8000",
-            "--chdir", ".",
-            "src.server.server:app"
+            "-m",
+            "gunicorn",
+            "-w",
+            "3",
+            "-b",
+            "0.0.0.0:8000",
+            "--chdir",
+            ".",
+            "src.server.server:app",
         ]
 
         process = subprocess.run(gunicorn_command)
         print(
             f"INFO: Gunicorn process terminated with code {process.returncode}.",
-            file=sys.stderr)
+            file=sys.stderr,
+        )
 
     except KeyboardInterrupt:
         pass
